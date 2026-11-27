@@ -4,7 +4,7 @@ import { api } from '../api/client';
 import { CallDurationTimer } from '../components/CallDurationTimer';
 import { StatusBadge } from '../components/StatusBadge';
 import type { AuthorizedCallerId, CallRecord } from '../types/api';
-import { isTerminalCallStatus } from '../utils/formatters';
+import { isTerminalCallStatus, isValidE164, normalizeE164Input } from '../utils/formatters';
 
 const DIAL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '0', '#'];
 
@@ -19,14 +19,18 @@ export function DialerPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    api
-      .callerIds()
-      .then((res) => {
-        setCallerIds(res.callerIds);
-        const def = res.callerIds.find((c) => c.isDefault) ?? res.callerIds[0];
+    Promise.all([api.callerIds(), api.listCalls({ page: 1, limit: 1 })])
+      .then(([cidRes, callsRes]) => {
+        setCallerIds(cidRes.callerIds);
+        const def = cidRes.callerIds.find((c) => c.isDefault) ?? cidRes.callerIds[0];
         if (def) setSelectedCallerId(def.id);
+
+        const latest = callsRes.items[0];
+        if (latest && !isTerminalCallStatus(latest.status)) {
+          setActiveCall(latest);
+        }
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load caller IDs'));
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load dialer data'));
   }, []);
 
   useEffect(() => {
@@ -56,12 +60,18 @@ export function DialerPage() {
       setError('Select an authorized caller ID first');
       return;
     }
+    const normalizedDest = normalizeE164Input(destination);
+    if (!isValidE164(normalizedDest)) {
+      setError('Enter a valid E.164 number with "+" and country code (e.g. +919876543210 or +12025550144)');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await api.initiateCall({
         callerIdId: selectedCallerId,
-        destinationNumber: destination,
+        destinationNumber: normalizedDest,
       });
+      setDestination(normalizedDest);
       setActiveCall(res.call);
       setSupportsMute(res.supportsMute);
       setMaxDurationSeconds(res.maxDurationSeconds);
@@ -140,7 +150,7 @@ export function DialerPage() {
                 type="tel"
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
-                placeholder="+12025550144"
+                placeholder="+919876543210"
                 disabled={isCallActive}
               />
               <button
@@ -151,6 +161,10 @@ export function DialerPage() {
               >
                 Del
               </button>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 6 }}>
+              Include <code>+</code> and country code (for example <code>+919876543210</code> or{' '}
+              <code>+12025550144</code>).
             </div>
           </div>
 

@@ -24,3 +24,11 @@ export function isTerminalCallStatus(status: string): boolean {
     status === 'BLOCKED'
   );
 }
+
+export function normalizeE164Input(phoneNumber: string): string {
+  return phoneNumber.trim().replace(/[\s().-]+/g, '');
+}
+
+export function isValidE164(phoneNumber: string): boolean {
+  return /^\+[1-9]\d{6,14}$/.test(normalizeE164Input(phoneNumber));
+}

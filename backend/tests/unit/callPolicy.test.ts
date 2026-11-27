@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateDestinationRules, isValidE164 } from '../../src/modules/calls/calls.service.js';
+import {
+  evaluateDestinationRules,
+  isValidE164,
+  normalizeE164,
+} from '../../src/modules/calls/calls.service.js';
 
 describe('Call policy & E.164 validation', () => {
-  it('validates E.164 numbers strictly', () => {
-    expect(isValidE164('+14155550101')).toBe(true);
+  it('normalizes formatted numbers and validates E.164 strictly', () => {
+    expect(normalizeE164(' +91 96619-88586 ')).toBe('+919661988586');
+    expect(isValidE164('+1 (415) 555-0101')).toBe(true);
     expect(isValidE164('+442079460958')).toBe(true);
     expect(isValidE164('14155550101')).toBe(false);
     expect(isValidE164('+0123456')).toBe(false);

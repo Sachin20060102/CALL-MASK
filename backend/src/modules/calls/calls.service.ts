@@ -16,8 +16,12 @@ export interface EffectiveOperationalPolicy {
   velocityMaxCalls: number;
 }
 
+export function normalizeE164(phoneNumber: string): string {
+  return phoneNumber.trim().replace(/[\s().-]+/g, '');
+}
+
 export function isValidE164(phoneNumber: string): boolean {
-  return /^\+[1-9]\d{6,14}$/.test(phoneNumber);
+  return /^\+[1-9]\d{6,14}$/.test(normalizeE164(phoneNumber));
 }
 
 export function evaluateDestinationRules(
@@ -100,12 +104,12 @@ export class CallsService {
     input: { callerIdId: string; destinationNumber: string },
     ipAddress?: string
   ) {
-    const destinationNumber = input.destinationNumber.trim();
+    const destinationNumber = normalizeE164(input.destinationNumber);
     if (!isValidE164(destinationNumber)) {
       throw new AppError(
         400,
         'INVALID_DESTINATION_NUMBER',
-        'Destination number must be a valid E.164 number (e.g. +12025550144)'
+        'Destination number must be a valid E.164 number including + and country code (e.g. +919876543210 or +12025550144)'
       );
     }
 
