@@ -15,6 +15,8 @@ describe('TelephonyService safety gate & mock adapter', () => {
       configuredMode: 'mock',
       complianceVerified: false,
       effectiveMode: 'mock',
+      twilioConfigured: false,
+      twilioWebRtcConfigured: false,
     });
   });
 

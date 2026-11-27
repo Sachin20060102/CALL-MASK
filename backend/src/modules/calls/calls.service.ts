@@ -101,7 +101,7 @@ export class CallsService {
 
   async initiateCall(
     authUser: AuthenticatedUser,
-    input: { callerIdId: string; destinationNumber: string },
+    input: { callerIdId: string; destinationNumber: string; transport?: 'AUTO' | 'REST' | 'WEBRTC' },
     ipAddress?: string
   ) {
     const destinationNumber = normalizeE164(input.destinationNumber);
@@ -269,6 +269,7 @@ export class CallsService {
           callerIdNumber: callerId.phoneNumber,
           destinationNumber,
           maxDurationSeconds: policy.maxCallDurationSeconds,
+          requestedTransport: input.transport,
           provider: {
             id: callerId.provider.id,
             code: callerId.provider.code,
@@ -339,6 +340,7 @@ export class CallsService {
       call: updated,
       maxDurationSeconds: policy.maxCallDurationSeconds,
       supportsMute: dispatchResult.supportsMute,
+      transport: dispatchResult.transport,
     };
   }
 
@@ -350,6 +352,7 @@ export class CallsService {
       failureCode?: string;
       providerReportedCostMicros?: number;
       providerCurrency?: string;
+      durationSecondsOverride?: number;
     }
   ) {
     const existing = await this.prisma.callRecord.findUnique({
@@ -374,7 +377,9 @@ export class CallsService {
       nextStatus === 'IN_PROGRESS' ? existing.answeredAt ?? now : existing.answeredAt;
 
     let durationSeconds = existing.durationSeconds;
-    if (isTerminal && answeredAt) {
+    if (typeof details?.durationSecondsOverride === 'number' && details.durationSecondsOverride >= 0) {
+      durationSeconds = details.durationSecondsOverride;
+    } else if (isTerminal && answeredAt) {
       durationSeconds = Math.max(0, Math.round((now.getTime() - answeredAt.getTime()) / 1000));
     }
 
@@ -407,7 +412,10 @@ export class CallsService {
   }
 
   async setMute(authUser: AuthenticatedUser, callId: string, muted: boolean) {
-    const call = await this.prisma.callRecord.findUnique({ where: { id: callId } });
+    const call = await this.prisma.callRecord.findUnique({
+      where: { id: callId },
+      include: { provider: true },
+    });
     if (!call) {
       throw new AppError(404, 'CALL_NOT_FOUND', 'Call record not found');
     }
@@ -424,7 +432,12 @@ export class CallsService {
     }
 
     const muteResult = call.providerCallId
-      ? await this.telephony.setMute(call.mode, call.providerCallId, muted)
+      ? await this.telephony.setMute(
+          call.mode,
+          call.providerCallId,
+          muted,
+          call.provider?.protocol ?? 'MOCK'
+        )
       : { supported: false, muted: call.muted };
 
     if (!muteResult.supported) {
@@ -453,7 +466,10 @@ export class CallsService {
   }
 
   async endCall(authUser: AuthenticatedUser, callId: string) {
-    const call = await this.prisma.callRecord.findUnique({ where: { id: callId } });
+    const call = await this.prisma.callRecord.findUnique({
+      where: { id: callId },
+      include: { provider: true },
+    });
     if (!call) {
       throw new AppError(404, 'CALL_NOT_FOUND', 'Call record not found');
     }
@@ -470,7 +486,11 @@ export class CallsService {
     }
 
     if (call.providerCallId) {
-      await this.telephony.endCall(call.mode, call.providerCallId);
+      await this.telephony.endCall(
+        call.mode,
+        call.providerCallId,
+        call.provider?.protocol ?? 'MOCK'
+      );
     }
 
     const terminalStatus: CallTransitionStatus =

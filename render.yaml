@@ -34,6 +34,20 @@ services:
         value: "false"
       - key: TELEPHONY_WEBHOOK_SECRET
         generateValue: true
+      - key: PUBLIC_API_BASE_URL
+        value: https://call-mask.onrender.com
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_CALLER_ID
+        sync: false
+      - key: TWILIO_API_KEY_SID
+        sync: false
+      - key: TWILIO_API_KEY_SECRET
+        sync: false
+      - key: TWILIO_TWIML_APP_SID
+        sync: false
       - key: DEFAULT_MAX_CALL_DURATION_SECONDS
         value: "1800"
       - key: DEFAULT_DAILY_CALL_LIMIT

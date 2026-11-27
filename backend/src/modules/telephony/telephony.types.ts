@@ -1,4 +1,5 @@
 export type TelephonyMode = 'mock' | 'live';
+export type CallTransport = 'MOCK' | 'REST' | 'WEBRTC' | 'SIP';
 
 export type CallTransitionStatus =
   | 'INITIATED'
@@ -13,6 +14,7 @@ export interface InitiateOutboundCallRequest {
   callerIdNumber: string;
   destinationNumber: string;
   maxDurationSeconds: number;
+  requestedTransport?: 'AUTO' | 'REST' | 'WEBRTC';
   provider: {
     id: string;
     code: string;
@@ -29,6 +31,7 @@ export interface InitiateOutboundCallResult {
   mode: 'MOCK' | 'LIVE';
   initialStatus: CallTransitionStatus;
   supportsMute: boolean;
+  transport: CallTransport;
 }
 
 export interface ProviderStatusCallback {
@@ -40,6 +43,7 @@ export interface ProviderStatusCallback {
       failureCode?: string;
       providerReportedCostMicros?: number;
       providerCurrency?: string;
+      durationSecondsOverride?: number;
     }
   ) => Promise<void>;
 }

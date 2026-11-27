@@ -264,5 +264,13 @@ describe('MocoCall API integration suite (payment-free operational calling)', ()
     });
     expect(auditRes.statusCode).toBe(200);
     expect(auditRes.json().logs.length).toBeGreaterThan(0);
+
+    const tokenRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/telephony/twilio/token',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(tokenRes.statusCode).toBe(200);
+    expect(tokenRes.json().webrtcEnabled).toBe(false);
   });
 });

@@ -127,6 +127,14 @@ A Render Blueprint is included in [render.yaml](render.yaml):
 - **Health Check Path**: `/api/v1/health`
 - **Required Env Vars**: `DATABASE_URL` (MySQL 8.4 connection string with `@` encoded as `%40`), `CORS_ORIGIN` (your frontend origin), and optional `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` to create an initial admin user on boot.
 
+### 6. Enabling Live Outbound Calling with Twilio (Optional)
+
+Telephony stays disabled by default (`TELEPHONY_ENABLED=false`, `TELEPHONY_MODE=mock`). Once you have verified compliance and a Twilio account (including a Twilio Free Trial for calling OTP-verified numbers):
+
+1. Set `TELEPHONY_ENABLED=true`, `TELEPHONY_MODE=live`, and `TELEPHONY_COMPLIANCE_VERIFIED=true`.
+2. Set `PUBLIC_API_BASE_URL` (e.g., `https://call-mask.onrender.com`), `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_CALLER_ID` (your Twilio phone number in E.164 format). On startup, MocoCall provisions the verified `twilio-voice` provider and `TWILIO_CALLER_ID`.
+3. *(Optional, for two-way browser microphone audio)* Also set `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET`, and `TWILIO_TWIML_APP_SID` pointing the TwiML App Voice URL to `POST <PUBLIC_API_BASE_URL>/api/v1/telephony/webhooks/twilio/voice`.
+
 ---
 
 ## Verification & Testing

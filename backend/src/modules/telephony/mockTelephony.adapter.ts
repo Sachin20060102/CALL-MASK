@@ -83,6 +83,7 @@ export class MockTelephonyAdapter implements TelephonyAdapter {
       mode: 'MOCK',
       initialStatus: 'INITIATED',
       supportsMute: true,
+      transport: 'MOCK',
     };
   }
 

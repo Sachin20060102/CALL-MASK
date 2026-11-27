@@ -160,10 +160,19 @@ Returns operational call statistics and quota status for the authenticated user.
 
 ---
 
-## 6. Telephony Provider Callbacks
+## 6. Telephony Provider Callbacks & WebRTC Tokens
+
+### `GET /api/v1/telephony/twilio/token`
+Authenticated endpoint returning `{ "webrtcEnabled": true, "token": "...", "identity": "..." }` when live Twilio WebRTC credentials (`TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET`, `TWILIO_TWIML_APP_SID`) and compliance flags are enabled; otherwise `{ "webrtcEnabled": false }`.
 
 ### `POST /api/v1/telephony/webhooks/status`
 Verified VoIP/SIP provider call status webhook. Rejected unless `TELEPHONY_ENABLED=true`, `TELEPHONY_COMPLIANCE_VERIFIED=true`, and valid `x-telephony-signature` header is supplied.
+
+### `POST /api/v1/telephony/webhooks/twilio/status`
+Twilio status callback webhook (`application/x-www-form-urlencoded`) verified via `X-Twilio-Signature` HMAC-SHA1. Maps `CallStatus`, `CallDuration`, and optional carrier `Price` telemetry.
+
+### `POST /api/v1/telephony/webhooks/twilio/voice`
+Twilio TwiML App Voice webhook (`application/x-www-form-urlencoded`) verified via `X-Twilio-Signature`. Returns TwiML `<Dial>` instructions for live browser WebRTC calls.
 
 ---
 

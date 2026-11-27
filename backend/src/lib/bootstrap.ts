@@ -120,6 +120,55 @@ export async function ensureOperationalBootstrap(
     }
   }
 
+  const twilioAccountSid = env.TWILIO_ACCOUNT_SID?.trim();
+  const twilioCallerId = env.TWILIO_CALLER_ID?.trim();
+  if (twilioAccountSid && twilioCallerId) {
+    const liveEnabled =
+      env.TELEPHONY_ENABLED?.trim().toLowerCase() === 'true' &&
+      env.TELEPHONY_COMPLIANCE_VERIFIED?.trim().toLowerCase() === 'true';
+
+    const twilioProvider = await prisma.telephonyProvider.upsert({
+      where: { code: 'twilio-voice' },
+      update: {
+        enabled: liveEnabled,
+        complianceVerified: env.TELEPHONY_COMPLIANCE_VERIFIED?.trim().toLowerCase() === 'true',
+        endpointUrl: 'https://api.twilio.com/2010-04-01',
+        healthStatus: liveEnabled ? 'HEALTHY' : 'DISABLED',
+      },
+      create: {
+        name: 'Twilio Programmable Voice',
+        code: 'twilio-voice',
+        protocol: 'VOIP_REST',
+        enabled: liveEnabled,
+        complianceVerified: env.TELEPHONY_COMPLIANCE_VERIFIED?.trim().toLowerCase() === 'true',
+        endpointUrl: 'https://api.twilio.com/2010-04-01',
+        healthStatus: liveEnabled ? 'HEALTHY' : 'DISABLED',
+      },
+    });
+
+    await prisma.authorizedCallerId.upsert({
+      where: {
+        phoneNumber_providerId: {
+          phoneNumber: twilioCallerId,
+          providerId: twilioProvider.id,
+        },
+      },
+      update: {
+        active: true,
+        verificationStatus: 'VERIFIED',
+        isGlobal: true,
+      },
+      create: {
+        providerId: twilioProvider.id,
+        phoneNumber: twilioCallerId,
+        label: 'Twilio Verified Caller ID',
+        verificationStatus: 'VERIFIED',
+        isGlobal: true,
+        active: true,
+      },
+    });
+  }
+
   const adminEmail = env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
   const adminPassword = env.BOOTSTRAP_ADMIN_PASSWORD;
   if (adminEmail && adminPassword && adminPassword.length >= 8) {

@@ -150,11 +150,25 @@ export const api = {
 
   usageSummary: () => request<UsageSummary>('/usage/summary'),
 
-  initiateCall: (payload: { callerIdId: string; destinationNumber: string }) =>
-    request<{ call: CallRecord; maxDurationSeconds: number; supportsMute: boolean }>('/calls', {
+  initiateCall: (payload: {
+    callerIdId: string;
+    destinationNumber: string;
+    transport?: 'AUTO' | 'REST' | 'WEBRTC';
+  }) =>
+    request<{
+      call: CallRecord;
+      maxDurationSeconds: number;
+      supportsMute: boolean;
+      transport?: 'MOCK' | 'REST' | 'WEBRTC' | 'SIP';
+    }>('/calls', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  twilioToken: () =>
+    request<{ webrtcEnabled: boolean; token?: string; identity?: string }>(
+      '/telephony/twilio/token'
+    ),
 
   listCalls: (params: { page?: number; limit?: number; status?: string; search?: string } = {}) => {
     const sp = new URLSearchParams();

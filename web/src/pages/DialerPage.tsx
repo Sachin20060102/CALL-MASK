@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
 import { api } from '../api/client';
 import { CallDurationTimer } from '../components/CallDurationTimer';
@@ -8,6 +8,11 @@ import { isTerminalCallStatus, isValidE164, normalizeE164Input } from '../utils/
 
 const DIAL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '0', '#'];
 
+interface ActiveWebRtcSession {
+  mute: (shouldMute: boolean) => void;
+  disconnect: () => void;
+}
+
 export function DialerPage() {
   const [callerIds, setCallerIds] = useState<AuthorizedCallerId[]>([]);
   const [selectedCallerId, setSelectedCallerId] = useState('');
@@ -15,12 +20,20 @@ export function DialerPage() {
   const [activeCall, setActiveCall] = useState<CallRecord | null>(null);
   const [supportsMute, setSupportsMute] = useState(true);
   const [maxDurationSeconds, setMaxDurationSeconds] = useState<number | null>(null);
+  const [webrtcEnabled, setWebrtcEnabled] = useState(false);
+  const [webrtcToken, setWebrtcToken] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const webrtcCallRef = useRef<ActiveWebRtcSession | null>(null);
+
   useEffect(() => {
-    Promise.all([api.callerIds(), api.listCalls({ page: 1, limit: 1 })])
-      .then(([cidRes, callsRes]) => {
+    Promise.all([
+      api.callerIds(),
+      api.listCalls({ page: 1, limit: 1 }),
+      api.twilioToken().catch(() => ({ webrtcEnabled: false as const })),
+    ])
+      .then(([cidRes, callsRes, twilioRes]) => {
         setCallerIds(cidRes.callerIds);
         const def = cidRes.callerIds.find((c) => c.isDefault) ?? cidRes.callerIds[0];
         if (def) setSelectedCallerId(def.id);
@@ -28,6 +41,11 @@ export function DialerPage() {
         const latest = callsRes.items[0];
         if (latest && !isTerminalCallStatus(latest.status)) {
           setActiveCall(latest);
+        }
+
+        if (twilioRes.webrtcEnabled && twilioRes.token) {
+          setWebrtcEnabled(true);
+          setWebrtcToken(twilioRes.token);
         }
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load dialer data'));
@@ -54,6 +72,9 @@ export function DialerPage() {
     return () => clearInterval(poll);
   }, [activeCall]);
 
+  const selectedProviderProtocol =
+    callerIds.find((c) => c.id === selectedCallerId)?.provider.protocol ?? 'MOCK';
+
   const handlePlaceCall = async () => {
     setError('');
     if (!selectedCallerId) {
@@ -70,11 +91,33 @@ export function DialerPage() {
       const res = await api.initiateCall({
         callerIdId: selectedCallerId,
         destinationNumber: normalizedDest,
+        transport: webrtcEnabled ? 'WEBRTC' : 'AUTO',
       });
       setDestination(normalizedDest);
       setActiveCall(res.call);
       setSupportsMute(res.supportsMute);
       setMaxDurationSeconds(res.maxDurationSeconds);
+
+      if (res.transport === 'WEBRTC' && webrtcToken) {
+        const { Device } = await import('@twilio/voice-sdk');
+        const device = new Device(webrtcToken, { logLevel: 1 });
+        const voiceCall = await device.connect({
+          params: {
+            To: normalizedDest,
+            From: res.call.callerIdNumber,
+            mococallRecordId: res.call.id,
+          },
+        });
+        webrtcCallRef.current = voiceCall;
+        voiceCall.on('disconnect', () => {
+          webrtcCallRef.current = null;
+          device.destroy();
+          void api.getCall(res.call.id).then((r) => setActiveCall(r.call)).catch(() => {});
+        });
+        voiceCall.on('error', (sdkErr) => {
+          setError(sdkErr?.message || 'Twilio browser audio error');
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initiate call');
     } finally {
@@ -86,7 +129,13 @@ export function DialerPage() {
     if (!activeCall) return;
     setError('');
     try {
-      const res = await api.muteCall(activeCall.id, !activeCall.muted);
+      const nextMuted = !activeCall.muted;
+      if (webrtcCallRef.current) {
+        webrtcCallRef.current.mute(nextMuted);
+        setActiveCall({ ...activeCall, muted: nextMuted });
+        return;
+      }
+      const res = await api.muteCall(activeCall.id, nextMuted);
       setActiveCall(res.call);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to toggle mute');
@@ -97,6 +146,10 @@ export function DialerPage() {
     if (!activeCall) return;
     setError('');
     try {
+      if (webrtcCallRef.current) {
+        webrtcCallRef.current.disconnect();
+        webrtcCallRef.current = null;
+      }
       const res = await api.endCall(activeCall.id);
       setActiveCall(res.call);
     } catch (err) {
@@ -113,6 +166,14 @@ export function DialerPage() {
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
           Select an authorized caller ID, enter an E.164 destination number, and manage active calls.
         </p>
+      </div>
+
+      <div className="alert alert-info">
+        {selectedProviderProtocol === 'VOIP_REST'
+          ? webrtcEnabled
+            ? 'Live Twilio Voice Ready (Browser WebRTC Microphone + Real PSTN Call).'
+            : 'Live Twilio Voice Ready (Server REST Call — rings destination number directly).'
+          : 'Mock Telephony Mode — simulated call lifecycle only (does not ring physical phones).'}
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -199,9 +260,9 @@ export function DialerPage() {
             <div style={{ color: 'var(--text-muted)', padding: '24px 0' }}>
               No active call. Enter a destination number and click <strong>Place Call</strong>.
               <p style={{ marginTop: 10, fontSize: '0.84rem' }}>
-                Tip: In default Mock Mode, valid E.164 numbers transition through{' '}
-                <code>INITIATED → RINGING → IN_PROGRESS</code>. Use <code>+15550009999</code> to
-                test simulated carrier failure.
+                In Mock Mode, valid E.164 numbers transition through{' '}
+                <code>INITIATED → RINGING → IN_PROGRESS</code>. Select a verified live Twilio
+                Caller ID to ring real verified numbers.
               </p>
             </div>
           ) : (

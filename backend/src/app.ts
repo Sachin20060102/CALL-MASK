@@ -43,6 +43,19 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     credentials: true,
   });
 
+  app.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string' },
+    (_request, body, done) => {
+      try {
+        const params = new URLSearchParams(typeof body === 'string' ? body : '');
+        done(null, Object.fromEntries(params.entries()));
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    }
+  );
+
   const telephonyService = new TelephonyService(env, options.mockTelephonyOptions);
   const eventsHub = new CallEventsHub();
   const callsService = new CallsService(prisma, redis, env, telephonyService, eventsHub);
@@ -79,7 +92,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   registerHealthRoutes(app, { prisma, redis, telephonyService });
   registerAuthRoutes(app, { prisma, redis, env });
   registerAccountRoutes(app, { prisma, callsService, requireAuth: requireAuth as never });
-  registerCallerIdRoutes(app, { prisma, requireAuth: requireAuth as never });
+  registerCallerIdRoutes(app, { prisma, env, requireAuth: requireAuth as never });
   registerCallRoutes(app, {
     prisma,
     env,

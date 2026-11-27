@@ -5,6 +5,7 @@ import type { AppPrismaClient } from '../../lib/prisma.js';
 import { verifyAccessToken } from '../../lib/auth.js';
 import { resolveAllowOriginHeader } from '../../lib/cors.js';
 import { AppError } from '../../lib/errors.js';
+import { mapTwilioStatus } from '../telephony/twilioTelephony.adapter.js';
 import { TelephonyService } from '../telephony/telephony.service.js';
 import { CallEventsHub } from './callEvents.hub.js';
 import { CallsService } from './calls.service.js';
@@ -12,6 +13,7 @@ import { CallsService } from './calls.service.js';
 const initiateCallSchema = z.object({
   callerIdId: z.string().min(1),
   destinationNumber: z.string().min(4).max(32),
+  transport: z.enum(['AUTO', 'REST', 'WEBRTC']).optional(),
 });
 
 const muteSchema = z.object({
@@ -216,5 +218,160 @@ export function registerCallRoutes(
     });
 
     return { ok: true, call: updated };
+  });
+
+  app.get(
+    '/api/v1/telephony/twilio/token',
+    { preHandler: deps.requireAuth as never },
+    async (request) => {
+      const twilio = deps.telephonyService.getTwilioAdapter();
+      const runtime = deps.telephonyService.getRuntimeState();
+      if (
+        !runtime.enabled ||
+        runtime.effectiveMode !== 'live' ||
+        !twilio.isWebRtcConfigured()
+      ) {
+        return { webrtcEnabled: false };
+      }
+
+      const identity = `mococall_user_${request.authUser!.id}`;
+      const token = await twilio.generateVoiceAccessToken(identity);
+      return {
+        webrtcEnabled: true,
+        token,
+        identity,
+      };
+    }
+  );
+
+  function buildTwilioWebhookUrl(requestUrl: string, headers: Record<string, unknown>): string {
+    const base = deps.env.PUBLIC_API_BASE_URL
+      ? deps.env.PUBLIC_API_BASE_URL.replace(/\/+$/, '')
+      : `${(headers['x-forwarded-proto'] as string) || 'https'}://${headers.host as string}`;
+    return `${base}${requestUrl}`;
+  }
+
+  function escapeXmlAttr(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  app.post('/api/v1/telephony/webhooks/twilio/status', async (request) => {
+    if (!deps.env.TELEPHONY_ENABLED || !deps.env.TELEPHONY_COMPLIANCE_VERIFIED) {
+      throw new AppError(
+        503,
+        'TELEPHONY_DISABLED',
+        'Live Twilio webhooks are inactive while telephony is disabled'
+      );
+    }
+
+    const params = (request.body ?? {}) as Record<string, string>;
+    const signature =
+      typeof request.headers['x-twilio-signature'] === 'string'
+        ? request.headers['x-twilio-signature']
+        : undefined;
+    const twilio = deps.telephonyService.getTwilioAdapter();
+    const webhookUrl = buildTwilioWebhookUrl(request.url, request.headers as Record<string, unknown>);
+
+    if (!twilio.validateSignature(signature, webhookUrl, params)) {
+      throw new AppError(401, 'INVALID_WEBHOOK_SIGNATURE', 'Invalid Twilio webhook signature');
+    }
+
+    const query = request.query as { callRecordId?: string };
+    const callSid = params.CallSid;
+    const call = query.callRecordId
+      ? await deps.prisma.callRecord.findUnique({ where: { id: query.callRecordId } })
+      : callSid
+        ? await deps.prisma.callRecord.findUnique({ where: { providerCallId: callSid } })
+        : null;
+
+    if (!call) {
+      throw new AppError(404, 'CALL_NOT_FOUND', 'No matching call record for Twilio callback');
+    }
+
+    if (callSid && call.providerCallId !== callSid && (!call.providerCallId || call.providerCallId.startsWith('webrtc_pending_'))) {
+      await deps.prisma.callRecord.update({
+        where: { id: call.id },
+        data: { providerCallId: callSid },
+      });
+    }
+
+    const mappedStatus = mapTwilioStatus(params.CallStatus);
+    const parsedDuration = params.CallDuration ? Number.parseInt(params.CallDuration, 10) : undefined;
+    const rawPrice = params.Price ? Math.abs(Number.parseFloat(params.Price)) : undefined;
+    const providerReportedCostMicros =
+      rawPrice !== undefined && Number.isFinite(rawPrice)
+        ? Math.round(rawPrice * 1_000_000)
+        : undefined;
+
+    const updated = await deps.callsService.applyStatusTransition(call.id, mappedStatus, {
+      terminationReason:
+        mappedStatus === 'FAILED' ? `TWILIO_${(params.CallStatus || 'FAILED').toUpperCase()}` : undefined,
+      failureCode: params.ErrorCode || undefined,
+      providerReportedCostMicros,
+      providerCurrency: params.PriceUnit || undefined,
+      durationSecondsOverride:
+        parsedDuration !== undefined && !Number.isNaN(parsedDuration) ? parsedDuration : undefined,
+    });
+
+    return { ok: true, call: updated };
+  });
+
+  app.post('/api/v1/telephony/webhooks/twilio/voice', async (request, reply) => {
+    if (!deps.env.TELEPHONY_ENABLED || !deps.env.TELEPHONY_COMPLIANCE_VERIFIED) {
+      return reply
+        .type('application/xml')
+        .send('<Response><Say>Telephony is disabled.</Say><Hangup/></Response>');
+    }
+
+    const params = (request.body ?? {}) as Record<string, string>;
+    const signature =
+      typeof request.headers['x-twilio-signature'] === 'string'
+        ? request.headers['x-twilio-signature']
+        : undefined;
+    const twilio = deps.telephonyService.getTwilioAdapter();
+    const webhookUrl = buildTwilioWebhookUrl(request.url, request.headers as Record<string, unknown>);
+
+    if (!twilio.validateSignature(signature, webhookUrl, params)) {
+      throw new AppError(401, 'INVALID_WEBHOOK_SIGNATURE', 'Invalid Twilio webhook signature');
+    }
+
+    const to = (params.To || '').trim();
+    const from = (params.From || deps.env.TWILIO_CALLER_ID || '').trim();
+    const callRecordId = (params.mococallRecordId || '').trim();
+    const callSid = (params.CallSid || '').trim();
+
+    if (callRecordId && callSid) {
+      const existing = await deps.prisma.callRecord.findUnique({ where: { id: callRecordId } });
+      if (existing) {
+        await deps.prisma.callRecord.update({
+          where: { id: existing.id },
+          data: { providerCallId: callSid },
+        });
+      }
+    }
+
+    if (!to || !from) {
+      return reply
+        .type('application/xml')
+        .send('<Response><Say>Missing destination or caller ID.</Say><Hangup/></Response>');
+    }
+
+    const statusUrl = callRecordId ? twilio.buildStatusCallbackUrl(callRecordId) : null;
+    const statusAttr = statusUrl
+      ? ` statusCallback="${escapeXmlAttr(statusUrl)}" statusCallbackEvent="initiated ringing answered completed"`
+      : '';
+
+    const twiml =
+      `<?xml version="1.0" encoding="UTF-8"?>` +
+      `<Response><Dial callerId="${escapeXmlAttr(from)}">` +
+      `<Number${statusAttr}>${escapeXmlAttr(to)}</Number>` +
+      `</Dial></Response>`;
+
+    return reply.type('application/xml').send(twiml);
   });
 }
