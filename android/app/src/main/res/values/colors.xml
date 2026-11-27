@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="mc_bg">#0B1120</color>
+    <color name="mc_surface">#111A2E</color>
+    <color name="mc_surface_alt">#18233D</color>
+    <color name="mc_border">#263554</color>
+    <color name="mc_text">#F1F5F9</color>
+    <color name="mc_text_muted">#94A3B8</color>
+    <color name="mc_primary">#3B82F6</color>
+    <color name="mc_success">#10B981</color>
+    <color name="mc_warning">#F59E0B</color>
+    <color name="mc_danger">#EF4444</color>
+    <color name="mc_info">#06B6D4</color>
+</resources>

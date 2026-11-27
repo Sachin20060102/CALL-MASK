@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum TelephonyProtocol {
+  MOCK
+  SIP
+  VOIP_REST
+}
+
+enum ProviderHealthStatus {
+  HEALTHY
+  DEGRADED
+  DISABLED
+}
+
+enum VerificationStatus {
+  VERIFIED
+  PENDING
+  REVOKED
+}
+
+enum RestrictionMatchType {
+  PREFIX
+  COUNTRY_CODE
+  EXACT
+}
+
+enum RestrictionAction {
+  BLOCK
+  ALLOW
+}
+
+enum CallMode {
+  MOCK
+  LIVE
+}
+
+enum CallStatus {
+  INITIATED
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELED
+  BLOCKED
+}
+
+enum AbuseCategory {
+  SPAM
+  SPOOFING_ATTEMPT
+  HIGH_FREQUENCY
+  RESTRICTED_DESTINATION
+  OTHER
+}
+
+enum AbuseSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AbuseReportStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id                     String     @id @default(cuid())
+  email                  String     @unique
+  passwordHash           String     @map("password_hash")
+  fullName               String     @map("full_name")
+  role                   UserRole   @default(USER)
+  status                 UserStatus @default(ACTIVE)
+  suspensionReason       String?    @map("suspension_reason")
+  maxCallDurationSeconds Int?       @map("max_call_duration_seconds")
+  dailyCallLimit         Int?       @map("daily_call_limit")
+  monthlyCallQuota       Int?       @map("monthly_call_quota")
+  defaultCallerIdId      String?    @map("default_caller_id_id")
+  createdAt              DateTime   @default(now()) @map("created_at")
+  updatedAt              DateTime   @updatedAt @map("updated_at")
+
+  defaultCallerId       AuthorizedCallerId?  @relation("DefaultCallerId", fields: [defaultCallerIdId], references: [id], onDelete: SetNull)
+  refreshTokens         RefreshToken[]
+  authorizedCallerIds   AuthorizedCallerId[] @relation("AssignedCallerIds")
+  callRecords           CallRecord[]
+  abuseReportsSubmitted AbuseReport[]        @relation("AbuseReporter")
+  abuseReportsTargeted  AbuseReport[]        @relation("AbuseTarget")
+  abuseReportsResolved  AbuseReport[]        @relation("AbuseResolver")
+  auditLogs             AuditLog[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model TelephonyProvider {
+  id                 String               @id @default(cuid())
+  name               String
+  code               String               @unique
+  protocol           TelephonyProtocol    @default(MOCK)
+  enabled            Boolean              @default(false)
+  complianceVerified Boolean              @default(false) @map("compliance_verified")
+  sipDomain          String?              @map("sip_domain")
+  endpointUrl        String?              @map("endpoint_url")
+  configJson         Json?                @map("config_json")
+  healthStatus       ProviderHealthStatus @default(DISABLED) @map("health_status")
+  lastHealthCheckAt  DateTime?            @map("last_health_check_at")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  authorizedCallerIds AuthorizedCallerId[]
+  callRecords         CallRecord[]
+
+  @@map("telephony_providers")
+}
+
+model AuthorizedCallerId {
+  id                 String             @id @default(cuid())
+  userId             String?            @map("user_id")
+  providerId         String             @map("provider_id")
+  phoneNumber        String             @map("phone_number")
+  label              String
+  verificationStatus VerificationStatus @default(VERIFIED) @map("verification_status")
+  isGlobal           Boolean            @default(false) @map("is_global")
+  active             Boolean            @default(true)
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  user          User?             @relation("AssignedCallerIds", fields: [userId], references: [id], onDelete: SetNull)
+  provider      TelephonyProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  defaultFor    User[]            @relation("DefaultCallerId")
+  callRecords   CallRecord[]
+
+  @@unique([phoneNumber, providerId])
+  @@index([userId])
+  @@map("authorized_caller_ids")
+}
+
+model DestinationRestriction {
+  id        String               @id @default(cuid())
+  pattern   String
+  matchType RestrictionMatchType @default(PREFIX) @map("match_type")
+  action    RestrictionAction    @default(BLOCK)
+  reason    String
+  active    Boolean              @default(true)
+  createdAt DateTime             @default(now()) @map("created_at")
+  updatedAt DateTime             @updatedAt @map("updated_at")
+
+  @@index([active, matchType])
+  @@map("destination_restrictions")
+}
+
+model CallRecord {
+  id                         String     @id @default(cuid())
+  userId                     String     @map("user_id")
+  callerIdId                 String     @map("caller_id_id")
+  providerId                 String     @map("provider_id")
+  callerIdNumber             String     @map("caller_id_number")
+  destinationNumber          String     @map("destination_number")
+  providerCallId             String?    @unique @map("provider_call_id")
+  mode                       CallMode   @default(MOCK)
+  status                     CallStatus @default(INITIATED)
+  muted                      Boolean    @default(false)
+  startedAt                  DateTime   @default(now()) @map("started_at")
+  answeredAt                 DateTime?  @map("answered_at")
+  endedAt                    DateTime?  @map("ended_at")
+  durationSeconds            Int        @default(0) @map("duration_seconds")
+  terminationReason          String?    @map("termination_reason")
+  failureCode                String?    @map("failure_code")
+  // Strictly platform-owner carrier telemetry; never represents a user charge or balance
+  providerReportedCostMicros Int?       @map("provider_reported_cost_micros")
+  providerCurrency           String?    @map("provider_currency")
+  createdAt                  DateTime   @default(now()) @map("created_at")
+  updatedAt                  DateTime   @updatedAt @map("updated_at")
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callerId     AuthorizedCallerId @relation(fields: [callerIdId], references: [id], onDelete: Restrict)
+  provider     TelephonyProvider  @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  events       CallEvent[]
+  abuseReports AbuseReport[]
+
+  @@index([userId, startedAt])
+  @@index([status])
+  @@map("call_records")
+}
+
+model CallEvent {
+  id           String     @id @default(cuid())
+  callRecordId String     @map("call_record_id")
+  eventType    String     @map("event_type")
+  status       CallStatus
+  metadataJson Json?      @map("metadata_json")
+  occurredAt   DateTime   @default(now()) @map("occurred_at")
+
+  callRecord CallRecord @relation(fields: [callRecordId], references: [id], onDelete: Cascade)
+
+  @@index([callRecordId, occurredAt])
+  @@map("call_events")
+}
+
+model AbuseReport {
+  id                String            @id @default(cuid())
+  reportedByUserId  String?           @map("reported_by_user_id")
+  targetUserId      String?           @map("target_user_id")
+  callRecordId      String?           @map("call_record_id")
+  category          AbuseCategory
+  severity          AbuseSeverity     @default(MEDIUM)
+  description       String            @db.Text
+  status            AbuseReportStatus @default(OPEN)
+  resolutionNote    String?           @map("resolution_note") @db.Text
+  resolvedByAdminId String?           @map("resolved_by_admin_id")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  reportedByUser  User?       @relation("AbuseReporter", fields: [reportedByUserId], references: [id], onDelete: SetNull)
+  targetUser      User?       @relation("AbuseTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  resolvedByAdmin User?       @relation("AbuseResolver", fields: [resolvedByAdminId], references: [id], onDelete: SetNull)
+  callRecord      CallRecord? @relation(fields: [callRecordId], references: [id], onDelete: SetNull)
+
+  @@index([status, severity])
+  @@map("abuse_reports")
+}
+
+model SystemSetting {
+  id               String   @id @default(cuid())
+  key              String   @unique
+  valueJson        Json     @map("value_json")
+  updatedByAdminId String?  @map("updated_by_admin_id")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?  @map("actor_user_id")
+  action      String
+  targetType  String   @map("target_type")
+  targetId    String?  @map("target_id")
+  detailsJson Json?    @map("details_json")
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  actorUser User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorUserId])
+  @@map("audit_logs")
+}

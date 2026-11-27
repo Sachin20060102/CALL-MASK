@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MocoCall</string>
+    <string name="tagline">Authorized Calling &amp; Operational Telemetry</string>
+    <string name="login_title">Sign in to MocoCall</string>
+    <string name="register_title">Create Operator Account</string>
+    <string name="email_hint">Email address</string>
+    <string name="password_hint">Password</string>
+    <string name="full_name_hint">Full name</string>
+    <string name="sign_in">Sign In</string>
+    <string name="create_account">Create Account</string>
+    <string name="go_to_register">Need an account? Register</string>
+    <string name="go_to_login">Already have an account? Sign In</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_dialer">Dialer</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+    <string name="telephony_mock_banner">Telephony disabled by default — running in Mock Calling Mode</string>
+    <string name="place_call">Place Call</string>
+    <string name="mute_call">Mute</string>
+    <string name="unmute_call">Unmute</string>
+    <string name="end_call">End Call</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="save_settings">Save Settings</string>
+</resources>

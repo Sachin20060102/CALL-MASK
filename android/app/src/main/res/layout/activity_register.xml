@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/mc_bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:text="@string/register_title"
+            android:textColor="@color/mc_text"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvError"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:background="@color/mc_surface_alt"
+            android:padding="10dp"
+            android:textColor="@color/mc_danger"
+            android:visibility="gone" />
+
+        <EditText
+            android:id="@+id/etFullName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:background="@color/mc_surface"
+            android:hint="@string/full_name_hint"
+            android:inputType="textPersonName"
+            android:padding="14dp"
+            android:textColor="@color/mc_text"
+            android:textColorHint="@color/mc_text_muted" />
+
+        <EditText
+            android:id="@+id/etEmail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:background="@color/mc_surface"
+            android:hint="@string/email_hint"
+            android:inputType="textEmailAddress"
+            android:padding="14dp"
+            android:textColor="@color/mc_text"
+            android:textColorHint="@color/mc_text_muted" />
+
+        <EditText
+            android:id="@+id/etPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="18dp"
+            android:background="@color/mc_surface"
+            android:hint="@string/password_hint"
+            android:inputType="textPassword"
+            android:padding="14dp"
+            android:textColor="@color/mc_text"
+            android:textColorHint="@color/mc_text_muted" />
+
+        <Button
+            android:id="@+id/btnRegister"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/create_account" />
+
+        <TextView
+            android:id="@+id/tvGoLogin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:padding="8dp"
+            android:text="@string/go_to_login"
+            android:textColor="@color/mc_primary"
+            android:textSize="14sp" />
+    </LinearLayout>
+</ScrollView>

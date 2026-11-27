@@ -1,0 +1,90 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mococall-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mococall_root_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-mococall}
+      MYSQL_USER: ${MYSQL_USER:-mococall_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mococall_dev_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-mococall_root_password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: mococall-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mococall-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      DATABASE_URL: mysql://${MYSQL_USER:-mococall_user}:${MYSQL_PASSWORD:-mococall_dev_password}@mysql:3306/${MYSQL_DATABASE:-mococall}
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change_me_access_secret_at_least_32_characters_long}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh_secret_at_least_32_characters_long}
+      JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
+      JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS:-604800}
+      TELEPHONY_ENABLED: ${TELEPHONY_ENABLED:-false}
+      TELEPHONY_MODE: ${TELEPHONY_MODE:-mock}
+      TELEPHONY_COMPLIANCE_VERIFIED: ${TELEPHONY_COMPLIANCE_VERIFIED:-false}
+      TELEPHONY_WEBHOOK_SECRET: ${TELEPHONY_WEBHOOK_SECRET:-change_me_telephony_webhook_secret}
+      DEFAULT_MAX_CALL_DURATION_SECONDS: ${DEFAULT_MAX_CALL_DURATION_SECONDS:-1800}
+      DEFAULT_DAILY_CALL_LIMIT: ${DEFAULT_DAILY_CALL_LIMIT:-50}
+      DEFAULT_MONTHLY_CALL_QUOTA: ${DEFAULT_MONTHLY_CALL_QUOTA:-500}
+      VELOCITY_WINDOW_SECONDS: ${VELOCITY_WINDOW_SECONDS:-60}
+      VELOCITY_MAX_CALLS: ${VELOCITY_MAX_CALLS:-5}
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:4000/api/v1}
+    container_name: mococall-web
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5173:80"
+
+volumes:
+  mysql_data:
+  redis_data:

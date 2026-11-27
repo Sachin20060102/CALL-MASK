@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: mococall-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install --include=dev && npm run build:full
+    startCommand: npx prisma migrate deploy && node dist/server.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: CORS_ORIGIN
+        value: https://maskcall.thisisnavneet.in
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        value: redis://localhost:6379
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_TTL_SECONDS
+        value: "900"
+      - key: JWT_REFRESH_TTL_SECONDS
+        value: "604800"
+      - key: TELEPHONY_ENABLED
+        value: "false"
+      - key: TELEPHONY_MODE
+        value: mock
+      - key: TELEPHONY_COMPLIANCE_VERIFIED
+        value: "false"
+      - key: TELEPHONY_WEBHOOK_SECRET
+        generateValue: true
+      - key: DEFAULT_MAX_CALL_DURATION_SECONDS
+        value: "1800"
+      - key: DEFAULT_DAILY_CALL_LIMIT
+        value: "50"
+      - key: DEFAULT_MONTHLY_CALL_QUOTA
+        value: "500"
+      - key: VELOCITY_WINDOW_SECONDS
+        value: "60"
+      - key: VELOCITY_MAX_CALLS
+        value: "5"

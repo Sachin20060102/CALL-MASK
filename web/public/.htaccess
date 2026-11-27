@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Do not rewrite backend API requests if proxied on the same host
+  RewriteRule ^api/ - [L]
+
+  # Serve existing static files and directories directly
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Route all React Router paths to index.html
+  RewriteRule ^ index.html [L]
+</IfModule>

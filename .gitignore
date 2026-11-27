@@ -1,0 +1,26 @@
+# Dependencies & build artifacts
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+
+# Environment files
+.env
+**/.env
+.env.local
+.env.*.local
+
+# Android & Gradle
+android/.gradle/
+android/local.properties
+android/**/build/
+android/*.iml
+android/.idea/
+*.apk
+*.aab
+
+# Logs & OS files
+*.log
+.DS_Store
+Thumbs.db

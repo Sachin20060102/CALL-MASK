@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/mc_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Account Settings"
+            android:textColor="@color/mc_text"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvProfileEmail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/mc_text_muted"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvAccountStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/mc_success"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvLimitsSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@color/mc_surface"
+            android:padding="12dp"
+            android:textColor="@color/mc_text_muted"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvSettingsFeedback"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@color/mc_surface_alt"
+            android:padding="10dp"
+            android:textColor="@color/mc_info"
+            android:visibility="gone" />
+
+        <EditText
+            android:id="@+id/etSettingsFullName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@color/mc_surface"
+            android:hint="@string/full_name_hint"
+            android:padding="14dp"
+            android:textColor="@color/mc_text"
+            android:textColorHint="@color/mc_text_muted" />
+
+        <Spinner
+            android:id="@+id/spinnerDefaultCallerId"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:background="@color/mc_surface" />
+
+        <EditText
+            android:id="@+id/etCurrentPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@color/mc_surface"
+            android:hint="Current password (if changing password)"
+            android:inputType="textPassword"
+            android:padding="14dp"
+            android:textColor="@color/mc_text"
+            android:textColorHint="@color/mc_text_muted" />
+
+        <EditText
+            android:id="@+id/etNewPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@color/mc_surface"
+            android:hint="New password (optional)"
+            android:inputType="textPassword"
+            android:padding="14dp"
+            android:textColor="@color/mc_text"
+            android:textColorHint="@color/mc_text_muted" />
+
+        <Button
+            android:id="@+id/btnSaveSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/save_settings" />
+
+        <Button
+            android:id="@+id/btnLogout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="@color/mc_danger"
+            android:text="@string/sign_out" />
+    </LinearLayout>
+</ScrollView>
